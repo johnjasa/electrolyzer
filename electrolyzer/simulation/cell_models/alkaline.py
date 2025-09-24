@@ -15,87 +15,10 @@ from attrs import field, define
 from scipy.constants import R, physical_constants, convert_temperature
 
 from electrolyzer.tools.type_dec import FromDictMixin
+from electrolyzer.tools.validators import range_val
 
 
 warnings.filterwarnings("ignore")
-"""
-[Oystein Ulleberg, 2003]
-    "Modeling of advanced alkaline electrolyzers: a system simulation approach"
-    https://www.sciencedirect.com/science/article/pii/S0360319902000332?via%3Dihub
-
-[Gambou, Guilbert,et al 2022]
-    "A Comprehensive Survey of Alkaline Eelctrolyzer Modeling: Electrical
-    Domain and Specific Electrolyte Conductivity"
-    https://www.mdpi.com/1996-1073/15/9/3452
-
-[Haug,Kreitz, 2017]
-    "Process modelling of an alkaline water electrolyzer"
-    https://www.sciencedirect.com/science/article/pii/S0360319917318633
-
-[Henou, Agbossou, 2014]
-    "Simulation tool based on a physics model and an electrical
-    analogy for an alkaline electrolyser"
-    https://www.sciencedirect.com/science/article/pii/S0378775313017527
-    ->cited by [Gambou, Guilbert,et al 2022]
-    -> HAS ALL THE VALUES FOR VARIABLES USED IN [Gambou, Guilbert,et al 2022]
-
-[Hammoudi,Henao, 2012]
-    "New multi-physics approach for modelling andn design of
-    alkaline electrolyzers"
-    https://www.sciencedirect.com/science/article/pii/S036031991201590X
-    -> Referenced by [Henou, Agbossou, 2014] for theta calculation
-        (electrode coverage)
-    ->Eqn 44 for bubble stuff
-    ->j_lim=300 kA/m^2
-    ->includes other efficiency losses
-    cites:
-    https://www.sciencedirect.com/science/article/pii/S0360128509000598
-
-[Brauns,2021]
-"Evaluation of Diaphragms and Membranes as Separators for Alkaline
-Water Electrolysis"
-    by Jorn Brauns et all 2021. J. Electrochem Soc 168 014510
-    https://iopscience.iop.org/article/10.1149/1945-7111/abda57/pdf
-    ->good numbers
-    ->electrolyte flow rate of 350 mL/min
-    ->total electrolyte volume of 10L
-    -> has supplementary material (need to checkout)
-    ->in "material stability" it mentions stuff about DEGRADATION
-
-NEL Report:
-https://www.energy.gov/sites/default/files/2022-02/2-Intro-Liquid%20Alkaline%20Workshop.pdf
-
-[Brauns, Turek 2020]
-"Alkaline Water Electrolysis Powered by Renewable Energy: A Review"
-    https://www.mdpi.com/2227-9717/8/2/248
-
-
-[Eigeldinger, Vogt 2000]
-"The bubble coverage of gas evolving electrodes in a flowing electrolyte"
-https://www.sciencedirect.com/science/article/pii/S0013468600005132
-    -> Ref 15 of Henou 2014 for current density and theta stuff
-    -> has current density equation with theta included
-
-[Haug, Koj, Turek 2017]
-"Influence of process conditions on gas purity in alkaline water electrolysis"
-by Phillip Haug, Motthias Koj, Thomas Turek [2017]
-https://www.sciencedirect.com/science/article/pii/S0360319916336588
-
-[Niroula, Chaudhary, Subedi, Thapa 2003]
-"Parametric Modelling and Optimization of Alkaline Electrolyzer for the Production
-of Green Hydrogen" by S. Niroula, C Chaudhary, A Subedi, and B S Thapa
-[2003] doi:10.1088/1757-899X/1279/1/012005
-https://iopscience.iop.org/article/10.1088/1757-899X/1279/1/012005/pdf
-
-[Vogt,Balzer 2005]
-"The bubble coverage of gas-evolving elecrodes in stagnant electrolytes"
-by H. Vogt and R.J. Balzer
-Volume 50, Issue 10, 15 March 2005, Pages 2073-2079
-https://www.sciencedirect.com/science/article/pii/S001346860400948X?via%3Dihub
-
-
-
-"""
 
 
 def ael_electrolyzer_model(X, a, b, c, d, e, f):
@@ -129,11 +52,13 @@ class AlkalineCell(FromDictMixin):
     turndown_ratio: float
     max_current_density: float
 
-    cell_area: float = field(init=False)
+    f_1: float  # faradaic coefficient in mA^2/cm^4
+    f_2: float = field(validator=range_val(0, 1))  # faradaic coefficient [unitless]
+
+    cell_area: float = field(init=False)  # cell area in cm^2
 
     # Electrode parameters #
     ####################
-    A_electrode: float = field(init=False)  # [cm^2]
     e_a: float = field(init=False)  # [cm] anode thickness
     e_c: float = field(init=False)  # [cm] cathode thickness
     d_am: float = field(init=False)  # [cm] Anode-membrane gap
@@ -151,7 +76,6 @@ class AlkalineCell(FromDictMixin):
 
     # Membrane parameters #
     ####################
-    A_membrane: float = field(init=False)  # [cm^2]
     e_m: float = field(init=False)  # [cm] membrane thickness
 
     # THIS ONE IS PRIMARLY BASED ON
@@ -166,6 +90,7 @@ class AlkalineCell(FromDictMixin):
     M_K: float = 39.0983  # molecular weight of Potassium [g/mol]
     lhv: float = 33.33  # lower heating value of H2 [kWh/kg]
     hhv: float = 39.41  # higher heating value of H2 [kWh/kg]
+    gibbs: float = 237.24e3  # Gibbs Energy of global reaction (J/mol)
 
     def __attrs_post_init__(self) -> None:
         # Cell parameters #
@@ -174,12 +99,12 @@ class AlkalineCell(FromDictMixin):
 
         # Electrode parameters #
         ########################
-        self.A_electrode = self.electrode["A_electrode"]
-        self.e_a = self.electrode["e_a"]
-        self.e_c = self.electrode["e_c"]
-        self.d_am = self.electrode["d_am"]
-        self.d_cm = self.electrode["d_cm"]
-        self.d_ac = self.electrode["d_ac"]
+        self.e_a = self.electrode["e_e"]  # anode thickness
+        self.e_c = self.electrode["e_e"]  # cathode thickness
+
+        self.d_am = self.electrode["d_em"]  # anode-membrane distance
+        self.d_cm = self.electrode["d_em"]  # cathode-membrane distance
+        self.d_ac = self.electrode["d_ac"]  # distance between electrodes
 
         # Electrolyte parameters #
         ##########################
@@ -187,7 +112,6 @@ class AlkalineCell(FromDictMixin):
 
         # Membrane parameters #
         #######################
-        self.A_membrane = self.membrane["A_membrane"]
         self.e_m = self.membrane["e_m"]
 
         # calcluate molarity and molality of KOH solution
@@ -214,7 +138,7 @@ class AlkalineCell(FromDictMixin):
         T_k = convert_temperature([T_C], "C", "K")[0]
         J_lim = 30  # [A/cm^2] [Vogt,Balzer 2005]
         T_amb = T_k = convert_temperature([25], "C", "K")[0]
-        j = I / self.A_electrode  # [A/cm^2] "nominal current density"
+        j = I / self.cell_area  # [A/cm^2] "nominal current density"
 
         # Eqn 19 of [Gambou, Guilbert,et al 2022]
         Pv_H20 = np.exp(
@@ -247,7 +171,8 @@ class AlkalineCell(FromDictMixin):
         # actual current density reflecting impact of bubble rate coverage
         theta_epsilon = self.calculate_bubble_rate_coverage(T_C, I)
         theta = theta_epsilon[0]
-        A_electrode_eff = self.A_electrode * (1 - theta)  # [cm^2]
+        # A_electrode_eff = self.A_electrode * (1 - theta)  # [cm^2]
+        A_electrode_eff = self.cell_area * (1 - theta)  # [cm^2]
         current_dens = I / A_electrode_eff  # [A/cm^2]
         return current_dens
 
@@ -369,7 +294,8 @@ class AlkalineCell(FromDictMixin):
         # Eqn 16
         Pv_KOH = np.exp((2.302 * a) + (b * np.log(Pv_H20)))
 
-        Urev0 = self.calc_open_circuit_voltage(T_C)
+        Urev0 = self.calc_reversible_voltage()
+        # Urev0 = self.calc_open_circuit_voltage(T_C)
 
         # Eqn 14
         U_rev = Urev0 + ((R * T_K) / (self.z * F)) * np.log(
@@ -452,13 +378,13 @@ class AlkalineCell(FromDictMixin):
         # Eqn 20 - resistivity of anode
         Ra = (
             rho_nickle_eff
-            * (self.e_a / self.A_electrode)
+            * (self.e_a / self.cell_area)
             * (1 + (temp_coeff * (T_C - tref)))
         )
         # Eqn 20 - resistivity of cathode
         Rc = (
             rho_nickle_eff
-            * (self.e_c / self.A_electrode)
+            * (self.e_c / self.cell_area)
             * (1 + (temp_coeff * (T_C - tref)))
         )
 
@@ -504,9 +430,8 @@ class AlkalineCell(FromDictMixin):
 
         # R_ele_bf: Bubble-free electrolyte resistance
         # Eqn 32 of [Gambou, Guilbert,et al 2022] and Eqn 19 of [Henou, Agbossou, 2014]
-
         R_ele_bf = (100 / sigma_bf) * (
-            (self.d_am / self.A_electrode) + (self.d_cm / self.A_electrode)
+            (self.d_am / self.cell_area) + (self.d_cm / self.cell_area)
         )
         # Eqn 2 of [Brauns,2021] says R_eg=(1/(sigma_koh))*((dcs+das)/A_el)
         # where A_el is the metal area, not the entire area (which has holes)
@@ -514,7 +439,6 @@ class AlkalineCell(FromDictMixin):
         # Resistance due to bubbles
         theta_epsilon = self.calculate_bubble_rate_coverage(T_C, I)
         epsilon = theta_epsilon[1]
-        # R_ele_b=R_ele_bf*((1/(1-epsilon)**(3/2))-1)
         # R_ele_b: Bubble resistance
         R_ele_b = R_ele_bf * ((1 / ((1 - epsilon) ** (3 / 2))) - 1)
         # ^Bruggman equation
@@ -531,7 +455,7 @@ class AlkalineCell(FromDictMixin):
         Reference:
         [Gambou, Guilbert,et al 2022]: Eqn 36
         [Henou, Agbossou, 2014]: Eqn 21
-        [NEL]: TODO add slide
+        [NEL]: TODO add reference to slide
         """
 
         # NOTE: THIS HAS BEEN VERIFIED
@@ -540,8 +464,9 @@ class AlkalineCell(FromDictMixin):
         # [Gambou, Guilbert,et al 2022]
         # S_mem=54.48 # membrane surface area in cm^2
 
+        # Equation 36 - Ohms
         Rmem = (0.06 + 80 * np.exp(T_C / 50)) / (
-            10000 * self.A_membrane
+            10000 * self.cell_area
         )  # Equation 36 - Ohms
         # ^ Equation 21 of [Henou, Agbossou, 2014]
         # output: Rmem=0.23 ohm*cm^2
@@ -595,29 +520,11 @@ class AlkalineCell(FromDictMixin):
         V_ohm = I * R_tot  # [V/cell]
         return V_ohm
 
-    def calc_open_circuit_voltage(self, T_C):
+    def calc_reversible_voltage(self):
         """
-        I [A]: current
-        T_C [C]: temperature
-        return :: E_rev0 [V/cell]: open-circuit voltage
-
-        TODO: Are we correcting for temperature twice? U_rev0 should be just 1.229 and
-        never change (possibly?)
-
-        Reference: [Gambou, Guilbert,et al 2022]: Eqn 14
+        Calculates reversible cell potential at standard state.
         """
-        # General Nerst Equation
-        # Eqn 14 of [Gambou, Guilbert,et al 2022]
-        T_K = convert_temperature([T_C], "C", "K")[0]
-        E_rev0 = (
-            1.5184
-            - (1.5421 * (10 ** (-3)) * T_K)
-            + (9.523 * (10 ** (-5)) * T_K * np.log(T_K))
-            + (9.84 * (10 ** (-8)) * (T_K**2))
-        )
-        # OR should this just be 1.229?
-        # E_rev_fake = 1.229
-        return E_rev0
+        return self.gibbs / (self.z * F)
 
     def calc_faradaic_efficiency(self, T_C, I):
         """
@@ -627,8 +534,8 @@ class AlkalineCell(FromDictMixin):
         Reference: [Oystein Ulleberg, 2003] Eqn 9, Table 3
         """
         # f1 and f2 values from Table 3
-        f1 = 250  # [mA^2/cm^4]
-        f2 = 0.96  # [-]
+        # f1 = 250  # [mA^2/cm^4]
+        # f2 = 0.96  # [-]
         j = self.calc_current_density(T_C, I)  # [A/cm^2]
         j *= 1000  # [mA/cm^2]
 
@@ -640,7 +547,7 @@ class AlkalineCell(FromDictMixin):
         #     f_2=[0.99,0.985,0.98,0.96] #[0-1]
 
         # Eqn 9 from [Oystein Ulleberg, 2003]
-        eta_F = f2 * (j**2) / (f1 + j**2)
+        eta_F = self.f_2 * (j**2) / (self.f_1 + j**2)
         return eta_F
 
     def calc_mass_flow_rate(self, T_C, I):
@@ -653,10 +560,9 @@ class AlkalineCell(FromDictMixin):
 
         eta_F = self.calc_faradaic_efficiency(T_C, I)
         # Eqn 10 [mol/sec]
-        h2_prod_mol = eta_F * I / (self.z * F)
+        h2_prod_mol = eta_F * I / (self.z * F)  # mol/s
         mfr = self.M_H * self.z * h2_prod_mol  # [g/sec]
         # z is valency number of electrons transferred per ion
         # for oxygen, z=4
         mfr = mfr / 1e3  # [kg/sec]
         return mfr
-        # h2_prod is in mol/s
