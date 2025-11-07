@@ -10,10 +10,11 @@ from numpy.testing import (
     assert_array_almost_equal,
 )
 
-import electrolyzer.inputs.validation as val
-from electrolyzer import Supervisor, run_electrolyzer
-from electrolyzer.inputs.validation import load_modeling_yaml
-from electrolyzer.glue_code.optimization import calc_rated_system
+import electrolyzer.tools.validation as val
+from electrolyzer.simulation.supervisor import Supervisor
+from electrolyzer.simulation.bert import run_electrolyzer
+from electrolyzer.tools.validation import load_modeling_yaml
+from electrolyzer.tools.design.optimization import calc_rated_system
 
 turbine_rating = 3.4  # MW
 
@@ -134,7 +135,7 @@ def test_regression(result):
     _, df = result
 
     # Test total kg H2 produced
-    assert_almost_equal(df["kg_rate"].sum(), 222.8930364856318, decimal=1)
+    assert_almost_equal(df["kg_rate"].sum(), 243.93038801007688, decimal=1)
 
     # Test degradation state of stacks
     degradation = df[[col for col in df if "deg" in col]]

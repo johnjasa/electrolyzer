@@ -2,8 +2,8 @@ import os
 
 from numpy.testing import assert_almost_equal
 
-from electrolyzer.inputs import validation as val
-from electrolyzer.glue_code.optimization import calc_rated_stack, calc_rated_system
+import electrolyzer.tools.validation as val
+from electrolyzer.tools.design.optimization import calc_rated_stack, calc_rated_system
 
 
 input_modeling = "./test_modeling_options.yaml"
@@ -18,7 +18,7 @@ def test_calc_rated_system():
 
     tuned_options = calc_rated_system(modeling_options)
 
-    assert tuned_options["electrolyzer"]["control"]["n_stacks"] == 4
+    assert tuned_options["electrolyzer"]["supervisor"]["n_stacks"] == 4
     assert_almost_equal(
         tuned_options["electrolyzer"]["stack"]["stack_rating_kW"], 500.0
     )
@@ -38,7 +38,7 @@ def test_calc_rated_stack():
     assert modeling_options["electrolyzer"]["stack"]["n_cells"] > 100
 
     # cell area should get smaller
-    modeling_options["electrolyzer"]["stack"]["cell_area"] < 1000
+    modeling_options["electrolyzer"]["cell_params"]["PEM_params"]["cell_area"] < 1000
 
     assert_almost_equal(
         modeling_options["electrolyzer"]["stack"]["stack_rating_kW"], 500.000, decimal=3
@@ -60,7 +60,10 @@ def test_calc_rated_stack_lower():
     assert modeling_options["electrolyzer"]["stack"]["n_cells"] > 100
 
     # cell area should decrease
-    assert modeling_options["electrolyzer"]["stack"]["cell_area"] < 1000
+    assert (
+        modeling_options["electrolyzer"]["cell_params"]["PEM_params"]["cell_area"]
+        < 1000
+    )
 
     # max current should decrease
     assert modeling_options["electrolyzer"]["stack"]["max_current"] < 2000
