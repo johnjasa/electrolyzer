@@ -137,15 +137,3 @@ Jupyter Book locally, the generated site lands in [docs/_build/html](docs/_build
 ```bash
 pytest
 ```
-
-## Contributing
-
-See [CONTRIBUTING.rst](CONTRIBUTING.rst) and [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md).
-
-## Citation
-
-If you use this work in academic research, please cite [CITATION.cff](CITATION.cff).
-
-## License
-
-Apache Software License 2.0. See [LICENSE](LICENSE).
