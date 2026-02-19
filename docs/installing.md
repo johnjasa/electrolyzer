@@ -16,11 +16,11 @@ For most use cases, installing from source will be the preferred installation ro
     cd electrolyzer
     ```
 
-3. Create a new virtual environment and change to it. Using Conda Python 3.11 (choose your favorite
+3. Create a new virtual environment and change to it. Using Conda Python 3.13 (choose your favorite
    supported version) and naming it 'electrolyzer_env' (choose your desired name):
 
     ```bash
-    conda create --name electrolyzer_env python=3.11 -y
+    conda create --name electrolyzer_env python=3.13 -y
     conda activate electrolyzer_env
     ```
 
