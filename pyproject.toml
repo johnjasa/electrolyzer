@@ -6,10 +6,10 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "electrolyzer"
 dynamic = ["version"]
-authors = [{name = "NREL", email = "christopher.bay@nrel.gov"}]
+authors = [{name = "NLR", email = "christopher.bay@nlr.gov"}]
 readme = {file = "README.md", content-type = "text/markdown"}
 description = "A controls-oriented engineering electrolyzer model."
-requires-python = ">=3.9, <3.12"
+requires-python = ">=3.11"
 license = {file = "LICENSE"}
 dependencies = [
     "numpy",
@@ -32,9 +32,9 @@ classifiers = [
     "License :: OSI Approved :: Apache Software License",
     "Natural Language :: English",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
 ]
 
 [project.optional-dependencies]
